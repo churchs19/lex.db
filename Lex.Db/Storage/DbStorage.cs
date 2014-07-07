@@ -14,10 +14,13 @@ namespace Lex.Db
 #endif
     public IDbSchemaStorage OpenSchema(string path, object home)
     {
+#if PORTABLE
+      return null;
+#else
       path = Path.Combine("Lex.Db", path);
       var root = home as string;
 
-#if NETFX_CORE //|| WINDOWS_PHONE
+#if NETFX_CORE 
       if (root == null) 
       {
         var folder = home as Windows.Storage.StorageFolder;
@@ -46,6 +49,7 @@ namespace Lex.Db
         root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
       return new FileSystem.DbSchemaStorage(Path.Combine(root, path));
+#endif
 #endif
     }
 

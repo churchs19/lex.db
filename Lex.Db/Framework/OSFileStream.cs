@@ -382,13 +382,10 @@ namespace Lex.Db
 
     protected override void Dispose(bool disposing)
     {
-      CloseHandle(_handle);
+      WinApi.CloseHandle(_handle);
       _handle = IntPtr.Zero;
       base.Dispose(disposing);
     }
-
-    [DllImport("kernel32.dll", EntryPoint = "CloseHandle", SetLastError = true)]
-    internal static extern bool CloseHandle(IntPtr handle);
   }
 
   static class OSFile
@@ -536,40 +533,55 @@ namespace Lex.Db
 
   static class WinApi
   {
-#if NETFX_CORE
-    [DllImport("kernel32.dll", EntryPoint = "CreateFile2", SetLastError = true, CharSet = CharSet.Unicode)]
-    public static extern IntPtr CreateFile(string fileName, FileAccess desiredAccess, FileShare shareMode, FileMode mode, IntPtr extendedParameters);
+#if WINDOWS_PHONE_APP
+    const string WinBaseDll = "api-ms-win-core-file-l2-1-0.dll";
+    const string FileApiDll = "api-ms-win-core-file-l1-2-0.dll";
+    const string HandleApiDll = "api-ms-win-core-handle-l1-1-0.dll";
 #else
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
-    public static extern IntPtr CreateFile(string fileName, FileAccess desiredAccess, FileShare shareMode, IntPtr securityAttributes, FileMode mode, FileOptions flagsAndOptions, IntPtr templateFile);
+    const string WinBaseDll = "Kernel32.dll";
+    const string FileApiDll = WinBaseDll;
+    const string HandleApiDll = WinBaseDll;
 #endif
 
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
+#if NETFX_CORE
+    [DllImport(FileApiDll, EntryPoint = "CreateFile2", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern IntPtr CreateFile(string fileName, FileAccess desiredAccess, FileShare shareMode, FileMode mode, IntPtr extendedParameters);
+#else
+    [DllImport(FileApiDll, SetLastError = true, CharSet = CharSet.Ansi)]
+    public static extern IntPtr CreateFile(string fileName, FileAccess desiredAccess, FileShare shareMode, IntPtr securityAttributes, FileMode mode, FileOptions flagsAndOptions, IntPtr templateFile);
+#endif
+
+    [DllImport(HandleApiDll, SetLastError = true)]
+    public static extern bool CloseHandle(IntPtr handle);
+
+
+    [DllImport(FileApiDll, SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern bool ReadFile(IntPtr fileHandle, IntPtr buffer, int numberOfBytesToRead, out int numberOfBytesRead, IntPtr overlapped);
 
 
-    [DllImport("kernel32.dll", SetLastError = true)]
+    [DllImport(FileApiDll, SetLastError = true)]
     public static extern bool FlushFileBuffers(IntPtr hFile);
 
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
+    [DllImport(FileApiDll, SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern bool WriteFile(IntPtr fileHandle, IntPtr buffer, int numberOfBytesToRead, out int numberOfBytesRead, IntPtr overlapped);
 
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
+    [DllImport(FileApiDll, SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern bool SetFilePointerEx(IntPtr handle, long distanceToMove, out long distanceToMoveHigh, SeekOrigin seekOrigin);
 
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
+    [DllImport(FileApiDll, SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern bool SetEndOfFile(IntPtr handle);
 
 #if NETFX_CORE
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport(FileApiDll, SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern bool DeleteFile(string path);
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+
+    [DllImport(WinBaseDll, SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern bool MoveFileEx(string sourcePath, string targetPath, MOVE_FILE_FLAGS flags);
 
     public static bool MoveFile(string sourcePath, string targetPath)
@@ -577,13 +589,13 @@ namespace Lex.Db
       return MoveFileEx(sourcePath, targetPath, MOVE_FILE_FLAGS.MOVEFILE_WRITE_THROUGH);
     }
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport(FileApiDll, SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern bool CreateDirectory(string path, IntPtr mustBeZero);
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport(FileApiDll, SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern bool RemoveDirectory(string path);
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode, BestFitMapping = false, ExactSpelling = false)]
+    [DllImport(FileApiDll, SetLastError = true, CharSet = CharSet.Unicode, BestFitMapping = false, ExactSpelling = false)]
     public static extern bool GetFileAttributesEx(string name, int fileInfoLevel, ref FILE_ATTRIBUTE_DATA lpFileInformation);
 
     public static FileAttributes GetFileAttributes(string path)
@@ -679,22 +691,27 @@ namespace Lex.Db
       public int Directory;
     };
 
-    [DllImport("kernel32.dll", EntryPoint = "GetFileInformationByHandleEx", SetLastError = true, CharSet = CharSet.Ansi)]
-    static extern bool GetFileInformationByHandleEx(IntPtr handle, FILE_INFO_BY_HANDLE_CLASS FileInformationClass, IntPtr lpFileInformation, int dwBufferSize);
+    [DllImport(WinBaseDll, SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern bool GetFileInformationByHandleEx(IntPtr handle, FILE_INFO_BY_HANDLE_CLASS infoClass, IntPtr info, int size);
 
     public static bool GetFileSizeEx(IntPtr handle, out long fileSize)
     {
       FILE_STANDARD_INFO info;
       unsafe
       {
-        var result = GetFileInformationByHandleEx(handle, FILE_INFO_BY_HANDLE_CLASS.FileStandardInfo, new IntPtr(&info), Marshal.SizeOf(typeof(FILE_STANDARD_INFO)));
+#if WINDOWS_APP || WINDOWS_PHONE_APP
+        var infoSize = Marshal.SizeOf<FILE_STANDARD_INFO>();
+#else
+        var infoSize = Marshal.SizeOf(typeof(FILE_STANDARD_INFO));
+#endif
+        var result = GetFileInformationByHandleEx(handle, FILE_INFO_BY_HANDLE_CLASS.FileStandardInfo, new IntPtr(&info), infoSize);
         fileSize = info.EndOfFile;
         return result;
       }
     }
 
 #else
-    [DllImport("kernel32.dll", EntryPoint = "GetFileSizeEx", SetLastError = true, CharSet = CharSet.Ansi)]
+    [DllImport(FileApiDll, EntryPoint = "GetFileSizeEx", SetLastError = true, CharSet = CharSet.Ansi)]
     public static extern bool GetFileSizeEx(IntPtr handle, out long fileSize);
 #endif
   }
