@@ -44,6 +44,9 @@ namespace Lex.Db
     public Guid? GuidNField { get; set; }
 
     public List<int> ListField { get; set; }
+#if !SILVERLIGHT || WINDOWS_PHONE
+    public SortedSet<int> SortedSetField { get; set; }
+#endif
     public Dictionary<string, int> DictField { get; set; }
     public ObservableCollection<int> CollectionField { get; set; }
 
@@ -51,13 +54,6 @@ namespace Lex.Db
     public TestEnum? EnumNField { get; set; }
 
     public byte[] BlobField;
-
-    public MyData()
-    {
-      ListField = new List<int>();
-      DictField = new Dictionary<string, int>();
-      CollectionField = new ObservableCollection<int>();
-    }
   }
 
   /// <summary>

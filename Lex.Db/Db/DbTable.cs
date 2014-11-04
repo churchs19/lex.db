@@ -190,7 +190,13 @@ namespace Lex.Db
 
     internal void Add<K>(Expression<Func<T, K>> keyBuilder, MemberInfo key, bool autoGen, IComparer<K> comparer = null)
     {
-      KeyIndex = new KeyIndex<T, K>(this, keyBuilder.Compile(), key, comparer);
+#if iOS
+      var keyGetter = key.GetGetter<T, K>();
+#else
+      var keyGetter = keyBuilder.Compile();
+#endif
+
+      KeyIndex = new KeyIndex<T, K>(this, keyGetter, key, comparer);
       Metadata.Key = DbTypes.GetDbType(keyBuilder.Body.Type);
 
       if (autoGen && key != null)
@@ -215,10 +221,21 @@ namespace Lex.Db
 
     void GenerateLongAutoGen(MemberInfo key)
     {
+#if iOS
+      var getter = key.GetGetter<T, long>();
+      var setter = key.GetSetter<T, long>();
+
+      _autoGen = (obj, index) =>
+      {
+        var value = getter(obj);
+        if (value == 0)
+          setter(obj, ((KeyIndex<T, long>)index).MaxKey + 1);
+      };
+#else
       // void GenAuto(T item, IKeyIndex<T> index)
       // {
       //    if (item.Member == 0) 
-      //      item.Member = ((KeyIndex<T,long>)index).GetMaxValue() + 1;
+      //      item.Member = ((KeyIndex<T,long>)index).MaxKey + 1;
       // }
       var obj = Expression.Parameter(typeof(T));
       var index = Expression.Parameter(typeof(IKeyIndex<T>));
@@ -231,10 +248,22 @@ namespace Lex.Db
       var ifBlock = Expression.IfThen(Expression.Equal(member, Expression.Constant(0L)), setter);
       var lambda = Expression.Lambda<Action<T, IKeyIndex<T>>>(ifBlock, obj, index);
       _autoGen = lambda.Compile();
+#endif
     }
 
     void GenerateIntAutoGen(MemberInfo key)
     {
+#if iOS
+      var getter = key.GetGetter<T, int>();
+      var setter = key.GetSetter<T, int>();
+
+      _autoGen = (obj, index) =>
+      {
+        var value = getter(obj);
+        if (value == 0)
+          setter(obj, ((KeyIndex<T, int>)index).MaxKey + 1);
+      };
+#else
       // void GenAuto(T item, IKeyIndex<T> index)
       // {
       //    if (item.Member == 0) 
@@ -251,10 +280,22 @@ namespace Lex.Db
       var ifBlock = Expression.IfThen(Expression.Equal(member, Expression.Constant(0)), setter);
       var lambda = Expression.Lambda<Action<T, IKeyIndex<T>>>(ifBlock, obj, index);
       _autoGen = lambda.Compile();
+#endif
     }
 
     void GenerateGuidAutoGen(MemberInfo key)
     {
+#if iOS
+      var getter = key.GetGetter<T, Guid>();
+      var setter = key.GetSetter<T, Guid>();
+      
+      _autoGen = (obj, index) =>
+      {
+        var value = getter(obj);
+        if (value == Guid.Empty)
+          setter(obj, Guid.NewGuid());
+      };
+#else
       // void GenAuto(T item, IKeyIndex<T> index)
       // {
       //    if (item.Member == Guid.Empty) 
@@ -270,6 +311,7 @@ namespace Lex.Db
       var ifBlock = Expression.IfThen(Expression.Equal(member, Expression.Constant(Guid.Empty)), setter);
       var lambda = Expression.Lambda<Action<T, IKeyIndex<T>>>(ifBlock, obj, index);
       _autoGen = lambda.Compile();
+#endif
     }
 
     internal void Add(MemberMap<T> map)
@@ -495,19 +537,34 @@ namespace Lex.Db
 
     static Func<T, Indexer<I1, I2>> BuildGetter<I1, I2>(MemberInfo member1, MemberInfo member2)
     {
+#if iOS
+      var getter1 = member1.GetGetter<T, I1>();
+      var getter2 = member2.GetGetter<T, I2>();
+
+      return obj => new Indexer<I1, I2>(getter1(obj), getter2(obj));
+#else
       var obj = Expression.Parameter(typeof(T), "obj");
       var tuple = Expression.New(typeof(Indexer<I1, I2>).GetConstructor(new[] { typeof(I1), typeof(I2) }), obj.Member(member1), obj.Member(member2));
 
       return Expression.Lambda<Func<T, Indexer<I1, I2>>>(tuple, obj).Compile();
+#endif
     }
 
     static Func<T, Indexer<I1, I2, I3>> BuildGetter<I1, I2, I3>(MemberInfo member1, MemberInfo member2, MemberInfo member3)
     {
+#if iOS
+      var getter1 = member1.GetGetter<T, I1>();
+      var getter2 = member2.GetGetter<T, I2>();
+      var getter3 = member2.GetGetter<T, I3>();
+
+      return obj => new Indexer<I1, I2, I3>(getter1(obj), getter2(obj), getter3(obj));
+#else
       var obj = Expression.Parameter(typeof(T), "obj");
       var tuple = Expression.New(typeof(Indexer<I1, I2, I3>).GetConstructor(new[] { typeof(I1), typeof(I2), typeof(I3) }),
         obj.Member(member1), obj.Member(member2), obj.Member(member3));
 
       return Expression.Lambda<Func<T, Indexer<I1, I2, I3>>>(tuple, obj).Compile();
+#endif
     }
 
     #endregion

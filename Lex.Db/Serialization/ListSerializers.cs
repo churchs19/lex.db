@@ -10,6 +10,23 @@ namespace Lex.Db.Serialization
     static readonly Action<DataWriter, T> _serializer = Serializer<T>.Writer;
     static readonly Func<DataReader, T> _deserializer = Serializer<T>.Reader;
 
+#if iOS
+    public static Action<DataWriter, object> ListWriter = (w, o) => WriteList(w, (List<T>)o);
+    public static Func<DataReader, object> ListReader = r => ReadList(r);
+
+    public static Action<DataWriter, object> SortedSetWriter = (w, o) => WriteSortedSet(w, (SortedSet<T>)o);
+    public static Func<DataReader, object> SortedSetReader = r => ReadSortedSet(r);
+
+    public static Action<DataWriter, object> HashSetWriter = (w, o) => WriteHashSet(w, (HashSet<T>)o);
+    public static Func<DataReader, object> HashSetReader = r => ReadHashSet(r);
+
+    public static Action<DataWriter, object> CollectionWriter = (w, o) => WriteCollection(w, (ObservableCollection<T>)o);
+    public static Func<DataReader, object> CollectionReader = r => ReadCollection(r);
+
+    public static Action<DataWriter, object> ArrayWriter = (w, o) => WriteArray(w, (T[])o);
+    public static Func<DataReader, object> ArrayReader = r => ReadArray(r);
+#endif
+
     internal static void WriteHashSet(DataWriter writer, HashSet<T> value)
     {
       writer.Write(value.Count);
@@ -61,6 +78,21 @@ namespace Lex.Db.Serialization
       foreach (var i in value)
         _serializer(writer, i);
     }
+
+#if !SILVERLIGHT || WINDOWS_PHONE
+    internal static SortedSet<T> ReadSortedSet(DataReader reader)
+    {
+      return new SortedSet<T>(ReadArray(reader));
+    }
+
+    internal static void WriteSortedSet(DataWriter writer, SortedSet<T> value)
+    {
+      writer.Write(value.Count);
+
+      foreach (var i in value)
+        _serializer(writer, i);
+    }
+#endif
 #endif
 
     internal static void WriteArray(DataWriter writer, T[] value)

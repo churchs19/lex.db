@@ -327,7 +327,13 @@ namespace Lex.Db
 
       var member = ExtractMember(indexBy, MemberUsage.DataIndex);
 
-      _table.CreateIndex(name, indexBy.Compile(), member, comparer);
+#if iOS
+      var indexByGetter = member.GetGetter<T, I1>();
+#else
+      var indexByGetter = indexBy.Compile();
+#endif
+
+      _table.CreateIndex(name, indexByGetter, member, comparer);
 
       return this;
     }

@@ -99,14 +99,14 @@ namespace Lex.Db
       {
         var db = new DbInstance(@"d:\test.db");
         db.Initialize();
-      } 
+      }
 #if SILVERLIGHT 
       catch (System.IO.IsolatedStorage.IsolatedStorageException) 
       {
         // SL without ElevatedPriviliges does not allow absolute path access
       }
 #endif
-      finally 
+      finally
       {
       }
     }
@@ -609,15 +609,18 @@ namespace Lex.Db
 
     #endregion
 
-    #region DateTime Rountrip Tests
+    #region Lists Rountrip Tests
 
     [TestMethod]
-    public void RountripList1()
+    public void RountripLists1()
     {
       var obj = new MyData
       {
-        ListField = { 1, 2, 3, 4, 5 },
-        DictField = { { "test1", 111 }, { "test2", 222 }, { "test3", 333 } }
+        ListField = new List<int> { 1, 2, 3, 4, 5 },
+#if !SILVERLIGHT || WINDOWS_PHONE
+        SortedSetField = new SortedSet<int> { 5, 2, 3, 4, 1 },
+#endif
+        DictField = new Dictionary<string, int> { { "test1", 111 }, { "test2", 222 }, { "test3", 333 } }
       };
 
       table.Save(obj);
@@ -625,6 +628,9 @@ namespace Lex.Db
       var newObj = table.LoadByKey(obj.Id);
 
       Assert.IsTrue(obj.ListField.SequenceEqual(newObj.ListField));
+#if !SILVERLIGHT || WINDOWS_PHONE
+      Assert.IsTrue(obj.SortedSetField.SequenceEqual(newObj.SortedSetField));
+#endif
       Assert.IsTrue(obj.DictField.Keys.SequenceEqual(newObj.DictField.Keys));
       Assert.IsTrue(obj.DictField.Values.SequenceEqual(newObj.DictField.Values));
     }
